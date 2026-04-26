@@ -238,6 +238,3 @@ npm run lint
 
 ---
 
-## License
-
-Add your project license information here.

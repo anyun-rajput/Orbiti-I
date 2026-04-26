@@ -1,0 +1,8 @@
+version: '3.8'
+services:
+  frontend:
+    build:
+      context: ../VMT-FRONTEND
+    ports:
+      - "443:443"
+    restart: unless-stopped

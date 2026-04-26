@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nessus-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Load from .env file (create this from .env.example)
+      # DO NOT hardcode credentials here
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - SMTP_SERVER=${SMTP_SERVER}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL}
+      - NESSUS_API_URL=${NESSUS_API_URL}
+      - NESSUS_ACCESS_KEY=${NESSUS_ACCESS_KEY}
+      - NESSUS_SECRET_KEY=${NESSUS_SECRET_KEY}
+      - API_ACCESS_TOKEN=${API_ACCESS_TOKEN}
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEBUG=${DEBUG:-False}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    
+    # Load environment from file (recommended)
+    env_file:
+      - .env.production
+    
+    volumes:
+      - ./src:/app/src
+    
+    depends_on:
+      - mysql
+      - elasticsearch
+    
+    networks:
+      - nessus-network
+    
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mysql:
+    image: mysql:8.0
+    container_name: nessus-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-nessusdb}
+      MYSQL_USER: ${MYSQL_USER:-nessus}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - nessus-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.0.0
+    container_name: nessus-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}
+      - xpack.security.enabled=true
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - nessus-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  elasticsearch_data:
+
+networks:
+  nessus-network:
+    driver: bridge
+
+# Usage:
+# 1. Create .env.production file from .env.example with your production credentials
+# 2. Run: docker-compose -f docker-compose.yml --env-file .env.production up -d
+# 3. Never commit credentials to git
